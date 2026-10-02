@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="theme-color" content="#FCFAF4">
+<script>/* needs a trailing slash so the icon, manifest and offline cache resolve under the secret path */
+if(/^https?:/.test(location.protocol)&&location.pathname.length>1&&!location.pathname.endsWith('/'))location.replace(location.pathname+'/'+location.search+location.hash);</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Chloe's EA">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash-1320x2868.png">
 <title>Chloe's EA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
@@ -306,6 +315,36 @@ nav.tabs li{position:relative}
 .srcdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
 .hub .dts{background:linear-gradient(135deg,#fff,var(--yellow2));box-shadow:var(--shadow)}
 .ev.ev-date{background:var(--yellow2);border-left-color:#E9C85C;box-shadow:none}
+.toast.has-undo{pointer-events:auto;padding:6px 6px 6px 18px;display:flex;align-items:center;gap:12px}
+.toast button{height:32px;padding:0 14px;border-radius:999px;background:var(--yellow);color:var(--brown);font-weight:600;font-size:13px}
+.sw{position:relative;overflow-x:clip}
+.sw-row{position:relative;z-index:1;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+.sw-del,.sw-right{position:absolute;top:0;bottom:0;width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;font-size:14px;border-radius:14px;z-index:0}
+.sw-del{right:0;background:#C9654F;color:#fff}
+.sw-right{left:0;background:var(--yellow);color:var(--brown)}
+.sw.stack{padding-bottom:12px;margin-bottom:-12px}
+.sw.stack > .sw-del,.sw.stack > .sw-right{bottom:12px}
+.sw.stack + .sw.stack{margin-top:8px}
+.sw.inline > .sw-del,.sw.inline > .sw-right{top:5px;bottom:5px;border-radius:12px}
+.card > .sw.inline > .li{border-top:0;padding:12px 0}
+.card > .sw.inline + .sw.inline{border-top:1px solid var(--line)}
+.card > .sw.inline:first-child > .li{padding-top:0}
+.card > .sw.inline:last-child > .li{padding-bottom:0}
+.card > .sw.inline:first-child > .sw-del{top:0}
+.card > .sw.inline:last-child > .sw-del{bottom:0}
+.sw > .trip-card{margin-top:0}
+.sw-row.inbox-item{margin-top:0}
+.sw.stack + .ev,.ev + .sw.stack{margin-top:8px}
+.reset-card{background:linear-gradient(135deg,var(--blue2),#fff 55%,var(--yellow2));box-shadow:none;border:1px solid rgba(255,255,255,.8)}
+.reset-step{margin-top:18px}
+.reset-step h3{font-size:15px;margin-bottom:8px}
+.reset-task{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.reset-task:first-of-type{border-top:0}
+.reset-acts{display:flex;gap:4px;flex:0 0 auto}
+.reset-acts button{height:40px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:500;box-shadow:inset 0 0 0 1px var(--line2)}
+.reset-day{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.reset-day:first-of-type{border-top:0}
+.reset-day b{width:56px;flex:0 0 56px;font-size:13px;font-weight:600;padding-top:1px}
 </style>
 </head>
 <body>
@@ -343,10 +382,12 @@ nav.tabs li{position:relative}
 <script>
 /* ===================== DATA ===================== */
 const KEY='chloe-ea-v1';
+const FIN=false; // finance section switched off; set to true to bring it back (data is kept)
 const PESO=n=>'₱'+Number(n||0).toLocaleString('en-PH',{maximumFractionDigits:0});
 const uid=()=>Math.random().toString(36).slice(2,9);
-const today=()=>{const d=new Date();return d.toISOString().slice(0,10)};
-const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const isoLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today=()=>isoLocal(new Date());
+const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return isoLocal(d)};
 const fmtDate=(iso,opts)=>new Date(iso+'T00:00:00').toLocaleDateString('en-US',opts||{weekday:'long',month:'long',day:'numeric'});
 const fmtShort=iso=>new Date(iso+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
 const fmtTime=t=>{if(!t)return'';const[h,m]=t.split(':').map(Number);const ap=h>=12?'PM':'AM';return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`};
@@ -458,10 +499,15 @@ S=normalize(S);
 const REMOTE=/^https?:/.test(location.protocol)&&location.pathname.length>1;
 const API=location.pathname.replace(/\/+$/,'')+'/api';
 let remoteReady=!REMOTE, saveT;
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
-  if(!REMOTE||!remoteReady)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await fetch(API+'/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(S)})}catch(e){toast('Saved locally — will retry')}},700)}
-async function loadRemote(){if(!REMOTE)return;try{const r=await fetch(API+'/state');if(r.status===200){const d=await r.json();if(d&&typeof d==='object'&&!Array.isArray(d)){S=normalize(d);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}}
-  remoteReady=true;if(r.status===204)save();render()}catch(e){remoteReady=true;toast('Offline — using this device\'s copy')}}
+function save(){S.updatedAt=Date.now();const now=JSON.stringify(S);if(UNDO.pending&&UNDO.pending!==now){UNDO.prev=UNDO.pending;UNDO.savedG=UNDO.g}UNDO.pending=null;try{localStorage.setItem(KEY,now)}catch(e){}
+  if(!REMOTE||!remoteReady)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await fetch(API+'/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(S)})}catch(e){toast('Saved on this device. It syncs when you\'re back online.',true)}},700)}
+async function pushNow(){if(!REMOTE)return;try{await fetch(API+'/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(S)})}catch(e){}}
+window.addEventListener('online',()=>{if(REMOTE&&remoteReady)pushNow()});
+async function loadRemote(){if(!REMOTE)return;try{const r=await fetch(API+'/state');if(r.status===200){const d=await r.json();if(d&&typeof d==='object'&&!Array.isArray(d)){
+    // Whichever copy was edited last wins, so edits made offline on this device aren't overwritten.
+    if((d.updatedAt||0)>=(S.updatedAt||0)){S=normalize(d);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+    else pushNow()}}
+  remoteReady=true;if(r.status===204)pushNow();render()}catch(e){remoteReady=true;toast('Offline — using this device\'s copy')}}
 /* synced Google events (read-only) */
 const SYNC={events:[],at:0,errors:[],loading:false};
 const SRC={personal:{n:'Personal',c:'#8FBBD6'},beise:{n:'Beise',c:'#E9C85C'},work:{n:'Work',c:'#9A8375'}};
@@ -471,7 +517,13 @@ async function loadCalendar(force){if(!REMOTE)return;SYNC.loading=true;if(tab===
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1800)}
+let toastT;function toast(m,noUndo){const t=$('#toast');const canUndo=!noUndo&&UNDO.prev&&UNDO.savedG===UNDO.g;
+  t.innerHTML=`<span>${esc(m)}</span>${canUndo?'<button id="undoBtn">Undo</button>':''}`;t.classList.toggle('has-undo',!!canUndo);t.classList.add('show');
+  if(canUndo){const prev=UNDO.prev;$('#undoBtn').onclick=e=>{e.stopPropagation();S=normalize(JSON.parse(prev));UNDO.prev=null;closeSheet();save();render();toast('Undone',true)}}
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),canUndo?4500:1800)}
+/* Undo: remember the state as it was right before each tap/key, and keep it once that tap changes something. */
+const UNDO={pending:null,prev:null,g:0,savedG:-1};
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,e=>{if(e.target.closest&&e.target.closest('#toast'))return;if(ev==='keydown'&&e.key!=='Enter')return;UNDO.g++;UNDO.pending=JSON.stringify(S)},true));
 const hourNow=()=>new Date().getHours();
 const timeOfDay=()=>{const h=hourNow();return h<12?'morning':h<17?'afternoon':'evening'};
 const nowHM=()=>{const d=new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
@@ -481,15 +533,39 @@ const dueToday=()=>openTasks().filter(t=>t.due===today());
 const overdue=()=>openTasks().filter(t=>t.due&&t.due<today());
 const upcomingTasks=()=>openTasks().filter(t=>t.due&&t.due>today()).sort((a,b)=>a.due.localeCompare(b.due));
 const DTYPES={birthday:'🎂',anniversary:'💍','gotcha day':'🐾',memorial:'🕯',other:'♡'};
-const nextOccur=d=>{const y=new Date().getFullYear();let iso=`${y}-${String(d.month).padStart(2,'0')}-${String(d.day).padStart(2,'0')}`;if(iso<today())iso=`${y+1}-${iso.slice(5)}`;return iso};
-const dateAge=d=>{if(!d.year)return'';const n=Number(nextOccur(d).slice(0,4))-d.year;return d.type==='birthday'?`turns ${n}`:d.type==='anniversary'?`${n} years`:`${n} years`};
-const dateEvents=()=>S.dates.map(d=>({id:'d_'+d.id,title:`${DTYPES[d.type]||'♡'} ${d.name}${d.type==='other'?'':' — '+d.type}${dateAge(d)?' ('+dateAge(d)+')':''}`,date:nextOccur(d),time:'',loc:'',allDay:true,src:'date',ref:d.id}));
+const inWhen=iso=>{const n=daysUntil(iso);if(n<=7)return relDay(iso);if(n<21)return `in ${n} days`;if(n<60)return `in ${Math.round(n/7)} weeks`;return `in ${Math.round(n/30.4)} months`};
+// ---- Important dates: yearly or monthly (monthsary) ----
+const pad2=n=>String(n).padStart(2,'0');
+const dim=(y,m)=>new Date(y,m,0).getDate();
+const isMonthly=d=>d.repeat==='monthly';
+// The occurrence in a given year (and month, for monthly). Day is clamped, so the 31st lands on the 30th/28th in short months.
+const occurIn=(d,y,m)=>{m=m||d.month;return `${y}-${pad2(m)}-${pad2(Math.min(d.day,dim(y,m)))}`};
+const startIso=d=>d.year?occurIn(d,d.year,d.month):'';
+const shiftMonth=(y,m,k)=>{const t=y*12+(m-1)+k;return [Math.floor(t/12),t%12+1]};
+function nextOccur(d){const n=new Date(),y=n.getFullYear(),m=n.getMonth()+1;let iso;
+  if(isMonthly(d)){iso=occurIn(d,y,m);if(iso<today()){const[y2,m2]=shiftMonth(y,m,1);iso=occurIn(d,y2,m2)}}
+  else{iso=occurIn(d,y);if(iso<today())iso=occurIn(d,y+1)}
+  const st=startIso(d);return st&&st>iso?st:iso}
+function lastOccur(d){const n=new Date(),y=n.getFullYear(),m=n.getMonth()+1;let iso;
+  if(isMonthly(d)){iso=occurIn(d,y,m);if(iso>today()){const[y2,m2]=shiftMonth(y,m,-1);iso=occurIn(d,y2,m2)}}
+  else{iso=occurIn(d,y);if(iso>today())iso=occurIn(d,y-1)}
+  const st=startIso(d);return st&&iso<st?'':iso}
+const monthsAt=(d,iso)=>(Number(iso.slice(0,4))-d.year)*12+(Number(iso.slice(5,7))-d.month);
+// A monthly date whose occurrence isn't a full year is a "monthsary"; every 12th month it's the anniversary itself.
+const isMonthsary=(d,iso)=>isMonthly(d)&&(d.year?monthsAt(d,iso)%12!==0:Number(iso.slice(5,7))!==d.month);
+const kindLabel=(d,iso)=>isMonthsary(d,iso)?'monthsary':d.type;
+// "turns 34" / "7 years" / "month 87" for a given occurrence (defaults to the next one). Nothing on the very first date.
+function dateAge(d,iso){if(!d.year)return'';iso=iso||nextOccur(d);if(!iso)return'';
+  if(isMonthly(d)){const n=monthsAt(d,iso);if(n<=0)return'';if(n%12===0)return n===12?'1 year':`${n/12} years`;return `month ${n}`}
+  const n=Number(iso.slice(0,4))-d.year;if(n<=0)return'';return d.type==='birthday'?`turns ${n}`:n===1?'1 year':`${n} years`}
+const dateTitle=(d,iso)=>{const k=kindLabel(d,iso),a=dateAge(d,iso);return `${DTYPES[d.type]||'♡'} ${d.name}${k==='other'?'':' — '+k}${a?' ('+a+')':''}`};
+const dateEventsOn=iso=>{const y=Number(iso.slice(0,4)),m=Number(iso.slice(5,7));return S.dates.filter(d=>{const st=startIso(d);if(st&&iso<st)return false;return isMonthly(d)?occurIn(d,y,m)===iso:occurIn(d,y)===iso}).map(d=>({id:'d_'+d.id,title:dateTitle(d,iso),date:iso,time:'',loc:'',allDay:true,src:'date',ref:d.id}))};
 const syncedEvents=()=>SYNC.events.filter(e=>S.calSources[e.src]!==false);
-const allEvents=()=>[...S.events,...syncedEvents(),...dateEvents()];
-const eventsOn=d=>allEvents().filter(e=>e.date===d).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+const allEvents=()=>[...S.events,...syncedEvents()];
+const eventsOn=d=>[...allEvents().filter(e=>e.date===d),...dateEventsOn(d)].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 const todayEvents=()=>eventsOn(today()).filter(e=>e.src!=='date');
 const remainingEvents=()=>todayEvents().filter(e=>e.src!=='date'&&(!e.time||e.time>=nowHM()));
-const upcomingDates=(n=7)=>S.dates.map(d=>({d,iso:nextOccur(d)})).filter(x=>daysUntil(x.iso)<=n).sort((a,b)=>a.iso.localeCompare(b.iso));
+const upcomingDates=(n=7)=>S.dates.map(d=>({d,iso:nextOccur(d)})).filter(x=>daysUntil(x.iso)<=(isMonthsary(x.d,x.iso)?Math.min(n,2):n)).sort((a,b)=>a.iso.localeCompare(b.iso));
 const remindersToday=()=>S.reminders.filter(r=>!r.done&&r.date===today());
 const upcomingTrip=()=>S.trips.filter(t=>t.status==='upcoming'&&t.start&&daysUntil(t.start)>=0).sort((a,b)=>a.start.localeCompare(b.start))[0];
 const monthExpenses=()=>{const m=today().slice(0,7);return S.expenses.filter(e=>e.date.startsWith(m))};
@@ -517,7 +593,7 @@ function openAddMenu(){
     <button data-a="task"><span class="i">✓</span>Task</button>
     <button data-a="reminder"><span class="i">◷</span>Reminder</button>
     <button data-a="event"><span class="i">▦</span>Event</button>
-    <button data-a="expense"><span class="i">₱</span>Expense</button>
+    ${FIN?'<button data-a="expense"><span class="i">₱</span>Expense</button>':''}
     <button data-a="note"><span class="i">✎</span>Note</button>
     <button data-a="shop"><span class="i">⊕</span>Shopping item</button>
     <button data-a="wish"><span class="i">✧</span>Wishlist item</button>
@@ -605,10 +681,13 @@ function editDate(d){
   const mval=`${d.year||new Date().getFullYear()}-${String(d.month).padStart(2,'0')}-${String(d.day).padStart(2,'0')}`;
   openSheet(`<h2>${isNew?'Important date':esc(d.name)}</h2><div class="field"><input name="name" placeholder="Who or what" value="${esc(d.name)}"></div>
   <div class="field2"><div class="field"><label>Type</label>${sel('type',Object.keys(DTYPES),d.type)}</div><div class="field"><label>Date</label><input type="date" name="date" value="${mval}"></div></div>
+  <div class="field" id="repField" ${['anniversary','other'].includes(d.type)?'':'hidden'}><label>Repeats</label><div class="seg" id="rSeg"><button data-r="yearly" class="${isMonthly(d)?'':'on'}">Every year</button><button data-r="monthly" class="${isMonthly(d)?'on':''}">Every month</button></div><p class="xs muted" style="margin:6px 4px 0">Monthly counts month 1, 2, 3… and shows the yearly ones as years.</p></div>
   <div class="field"><label>Know the year?</label><div class="seg" id="ySeg"><button data-y="1" class="${d.year?'on':''}">Yes, use it</button><button data-y="0" class="${d.year?'':'on'}">Not sure</button></div></div>
   <div class="field"><label>Notes / gift ideas</label><textarea name="notes">${esc(d.notes)}</textarea></div>
-  <div class="sheet-actions">${isNew?'':'<button class="btn danger" id="del">Delete</button>'}<button class="btn" id="ok">${isNew?'Save date':'Save'}</button></div>`,el=>{let useY=!!d.year;$$('#ySeg button',el).forEach(b=>b.onclick=()=>{useY=b.dataset.y==='1';$$('#ySeg button',el).forEach(x=>x.classList.toggle('on',x===b))});
-    $('#ok',el).onclick=()=>{const f=readForm(el);if(!f.name.trim()||!f.date)return toast('Name and date, please');const[y,m,dd]=f.date.split('-').map(Number);Object.assign(d,{name:f.name.trim(),type:f.type,month:m,day:dd,year:useY?y:'',notes:f.notes});if(isNew){d.id=uid();S.dates.push(d)}save();closeSheet();toast('Saved');render()};
+  <div class="sheet-actions">${isNew?'':'<button class="btn danger" id="del">Delete</button>'}<button class="btn" id="ok">${isNew?'Save date':'Save'}</button></div>`,el=>{let useY=!!d.year,rep=d.repeat||'yearly';$$('#rSeg button',el).forEach(b=>b.onclick=()=>{rep=b.dataset.r;$$('#rSeg button',el).forEach(x=>x.classList.toggle('on',x===b))});
+    $('select[name=type]',el).onchange=e=>{$('#repField',el).hidden=!['anniversary','other'].includes(e.target.value)};
+    $$('#ySeg button',el).forEach(b=>b.onclick=()=>{useY=b.dataset.y==='1';$$('#ySeg button',el).forEach(x=>x.classList.toggle('on',x===b))});
+    $('#ok',el).onclick=()=>{const f=readForm(el);if(!f.name.trim()||!f.date)return toast('Name and date, please');const[y,m,dd]=f.date.split('-').map(Number);Object.assign(d,{name:f.name.trim(),type:f.type,month:m,day:dd,year:useY?y:'',notes:f.notes,repeat:['anniversary','other'].includes(f.type)?rep:'yearly'});if(isNew){d.id=uid();S.dates.push(d)}save();closeSheet();toast('Saved');render()};
     const x=$('#del',el);if(x)x.onclick=()=>{S.dates=S.dates.filter(z=>z.id!==d.id);save();closeSheet();render()};setTimeout(()=>$('input',el).focus(),250)});
 }
 function showSynced(e){
@@ -670,14 +749,35 @@ function daySummary(){
 function worthKnowing(){
   const out=[];
   overdue().forEach(t=>out.push({lvl:'urgent',t:`${t.title} — overdue by ${-daysUntil(t.due)} day${-daysUntil(t.due)>1?'s':''}`}));
-  S.payments.filter(p=>daysUntil(p.date)>=0&&daysUntil(p.date)<=3).forEach(p=>out.push({lvl:daysUntil(p.date)<=1?'urgent':'important',t:`${p.title} ${PESO(p.amt)} due ${relDay(p.date)}`}));
+  (FIN?S.payments:[]).filter(p=>daysUntil(p.date)>=0&&daysUntil(p.date)<=3).forEach(p=>out.push({lvl:daysUntil(p.date)<=1?'urgent':'important',t:`${p.title} ${PESO(p.amt)} due ${relDay(p.date)}`}));
   S.pet.vet.filter(v=>daysUntil(v.date)>=0&&daysUntil(v.date)<=7).forEach(v=>out.push({lvl:'important',t:`${S.pet.name}'s ${v.t.toLowerCase()} ${daysUntil(v.date)===0?'is today':'in '+daysUntil(v.date)+' days'}`}));
   S.pet.meds.filter(m=>daysUntil(m.next)>=0&&daysUntil(m.next)<=3).forEach(m=>out.push({lvl:'important',t:`${S.pet.name}'s ${m.t.toLowerCase()} is due ${relDay(m.next)}`}));
   const tr=upcomingTrip();if(tr&&daysUntil(tr.start)<=21)out.push({lvl:'upcoming',t:`${tr.dest} trip in ${daysUntil(tr.start)} days${tr.packing.length?'':' — no packing list yet'}`});
   S.reminders.filter(r=>!r.done&&daysUntil(r.date)>=0&&daysUntil(r.date)<=2).forEach(r=>out.push({lvl:daysUntil(r.date)===0?'important':'upcoming',t:`${r.title} — ${relDay(r.date)}`}));
-  upcomingDates(7).forEach(({d,iso})=>out.push({lvl:daysUntil(iso)<=1?'important':'upcoming',t:`${d.name}'s ${d.type==='other'?'date':d.type} ${daysUntil(iso)===0?'is today':daysUntil(iso)===1?'is tomorrow':'in '+daysUntil(iso)+' days'}${dateAge(d)?' · '+dateAge(d):''}`}));
+  upcomingDates(7).forEach(({d,iso})=>out.push({lvl:daysUntil(iso)<=1?'important':'upcoming',t:`${d.name}'s ${kindLabel(d,iso)==='other'?'date':kindLabel(d,iso)} ${daysUntil(iso)===0?'is today':daysUntil(iso)===1?'is tomorrow':'in '+daysUntil(iso)+' days'}${dateAge(d,iso)?' · '+dateAge(d,iso):''}`}));
   S.tasks.filter(t=>!t.done&&t.postponed>=2).forEach(t=>out.push({lvl:'upcoming',t:`You've postponed “${t.title}” ${t.postponed} times`}));
   return out.slice(0,6);
+}
+/* ---- Sunday reset: close out this week, peek at the next ---- */
+const resetDue=()=>{const n=new Date();return n.getDay()===0&&n.getHours()>=12&&S.lastReset!==today()};
+const nextMonday=()=>{const dow=new Date(today()+'T00:00:00').getDay();return addDays(today(),dow===0?1:8-dow)};
+function openReset(){openSheet('<div id="resetBody"></div>');renderReset()}
+function renderReset(){
+  const el=$('#resetBody');if(!el)return;
+  const mon=nextMonday();const left=openTasks().filter(t=>t.due&&t.due<mon).sort((a,b)=>a.due.localeCompare(b.due));
+  const days=[...Array(7)].map((_,i)=>addDays(mon,i)).map(d=>({d,ev:eventsOn(d),tk:openTasks().filter(t=>t.due===d)})).filter(x=>x.ev.length||x.tk.length);
+  el.innerHTML=`<h2>Sunday reset</h2><p class="muted small" style="margin:-6px 0 6px">Close out this week, then see what's next.</p>
+  <div class="reset-step"><h3>Still open</h3>${left.length?`${left.map(t=>`<div class="reset-task"><div class="grow"><div class="t">${esc(t.title)}</div><div class="xs muted">${t.due<today()?'Overdue · ':''}${relDay(t.due)}</div></div><div class="reset-acts"><button data-rt="done:${t.id}">Done</button><button data-rt="mon:${t.id}">Monday</button><button data-rt="drop:${t.id}">Drop</button></div></div>`).join('')}
+    ${left.length>1?'<button class="btn soft sm" id="allMon" style="margin-top:10px">Move all to Monday</button>':''}`:'<p class="muted small">Nothing left over. Clean week.</p>'}</div>
+  <div class="reset-step"><h3>Inbox</h3>${S.inbox.length?`<div class="row between"><p class="small">${S.inbox.length} unsorted item${S.inbox.length>1?'s':''}</p><button class="btn soft sm" id="rsInbox">Sort with EA</button></div>`:'<p class="muted small">Your inbox is clear.</p>'}</div>
+  <div class="reset-step"><h3>Next week</h3>${days.length?days.map(x=>`<div class="reset-day"><b>${fmtDate(x.d,{weekday:'short'})} ${Number(x.d.slice(8))}</b><div class="grow">${x.ev.map(e=>`<div class="small">${e.time?fmtTime(e.time)+' · ':''}${esc(e.title)}</div>`).join('')}${x.tk.map(t=>`<div class="small muted">Due: ${esc(t.title)}</div>`).join('')}</div></div>`).join(''):'<p class="muted small">Nothing on the calendar yet. A clear week.</p>'}</div>
+  <div class="sheet-actions"><button class="btn" id="rsDone">That's the week</button></div>`;
+  $$('[data-rt]',el).forEach(b=>b.onclick=()=>{const[k,id]=b.dataset.rt.split(':');const t=S.tasks.find(x=>x.id===id);if(!t)return;
+    if(k==='done')t.done=true;else if(k==='mon'){t.due=mon;t.postponed=(t.postponed||0)+1}else S.tasks=S.tasks.filter(x=>x.id!==id);
+    save();toast(k==='done'?'Done':k==='mon'?'Moved to Monday':'Dropped');render();renderReset()});
+  const am=$('#allMon',el);if(am)am.onclick=()=>{left.forEach(t=>{t.due=mon;t.postponed=(t.postponed||0)+1});save();toast('All moved to Monday');render();renderReset()};
+  const ri=$('#rsInbox',el);if(ri)ri.onclick=()=>{closeSheet();go('ea');handleEA('Organize my inbox')};
+  $('#rsDone',el).onclick=()=>{S.lastReset=today();save();closeSheet();toast('Week closed out');render()};
 }
 function renderHome(){
   const tod=timeOfDay();const sum=daySummary();
@@ -697,10 +797,11 @@ function renderHome(){
   </div>
   ${tod==='evening'&&(doneToday||leftToday)?`<div class="sec"><div class="card cream"><h3>${leftToday?'Nearly there.':'That\'s the day.'}</h3><p class="small muted" style="margin-top:4px">${doneToday?`You got ${doneToday} of ${doneToday+leftToday} things done today.`:''} ${leftToday?`${leftToday===1?'One task':leftToday+' tasks'} can roll over to tomorrow.`:'You\'re all clear.'}</p>
     ${leftToday?`<button class="btn soft sm" style="margin-top:10px" id="rollover">Roll over to tomorrow</button>`:''}</div></div>`:''}
+  ${resetDue()?`<div class="sec"><div class="card reset-card"><h3>Sunday reset</h3><p class="small" style="margin-top:4px">Close out this week and peek at the next. About two minutes.</p><div class="row" style="margin-top:12px;gap:8px"><button class="btn sm" id="startReset">Start</button><button class="btn ghost sm" id="skipReset">Skip this week</button></div></div></div>`:''}
   <div class="sec"><div class="sec-h"><h2>${tod==='evening'?'Tomorrow':'Up next'}</h2><button data-go="cal">Calendar</button></div>
     <div class="card glass upnext">${(tod==='evening'?tmr:nextEvs).length?(tod==='evening'?tmr:nextEvs).map(e=>`<div class="item"><time>${fmtTime(e.time)||'All day'}</time><div><div class="t">${esc(e.title)}</div>${e.loc||e.src?`<div class="small muted">${e.src&&SRC[e.src]?`<i class="srcdot" style="background:${SRC[e.src].c}"></i>${SRC[e.src].n}${e.loc?' · ':''}`:''}${esc(e.loc)}</div>`:''}</div></div>`).join(''):`<p class="muted">${tod==='evening'?'Nothing on tomorrow\'s calendar yet.':'Your calendar is clear today.'}</p>`}</div></div>
   ${wk.length?`<div class="sec"><div class="sec-h"><h2>Worth knowing</h2></div><div class="card wk">${wk.map(w=>`<div class="item"><span class="dot ${w.lvl}"></span><div class="grow"><div>${esc(w.t)}</div></div><span class="tag ${w.lvl}">${w.lvl}</span></div>`).join('')}</div></div>`:''}
-  ${payNext||monthSpend()?`<div class="sec"><div class="sec-h"><h2>Money</h2><button data-life="finance">Finance</button></div><div class="card yellow row between"><div><div class="small muted">Spent this month</div><div style="font-size:22px;font-weight:600" class="money">${PESO(monthSpend())}</div></div>${payNext?`<div style="text-align:right"><div class="small muted">Next payment</div><div style="font-weight:500">${esc(payNext.title)} · ${relDay(payNext.date)}</div></div>`:''}</div></div>`:''}
+  ${FIN&&(payNext||monthSpend())?`<div class="sec"><div class="sec-h"><h2>Money</h2><button data-life="finance">Finance</button></div><div class="card yellow row between"><div><div class="small muted">Spent this month</div><div style="font-size:22px;font-weight:600" class="money">${PESO(monthSpend())}</div></div>${payNext?`<div style="text-align:right"><div class="small muted">Next payment</div><div style="font-weight:500">${esc(payNext.title)} · ${relDay(payNext.date)}</div></div>`:''}</div></div>`:''}
   ${tr?`<div class="sec"><div class="sec-h"><h2>Travel</h2><button data-life="travel">Trips</button></div><button class="trip-card" data-trip="${tr.id}"><span class="flag">${tr.flag}</span><h3>${esc(tr.dest)}</h3><div class="small muted">${fmtShort(tr.start)} – ${fmtShort(tr.end)}</div><span class="cd">${daysUntil(tr.start)} days away</span></button></div>`:
     `<div class="sec"><div class="card blue"><b>No upcoming trips yet.</b><p class="small muted" style="margin-top:3px">Somewhere on your mind?</p></div></div>`}
   <button class="ask" data-go="ea"><span class="star">✦</span><span>What can I help with?</span></button>
@@ -709,6 +810,7 @@ function renderHome(){
   $$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   $$('[data-life]').forEach(b=>b.onclick=()=>{lifePage=b.dataset.life;go('life')});
   $$('[data-trip]').forEach(b=>b.onclick=()=>{lifePage='trip:'+b.dataset.trip;go('life')});
+  const sr=$('#startReset');if(sr)sr.onclick=openReset;const sk=$('#skipReset');if(sk)sk.onclick=()=>{S.lastReset=today();save();toast('Skipped this week');render()};
   const ro=$('#rollover');if(ro)ro.onclick=()=>{dueToday().forEach(t=>{t.due=addDays(today(),1);t.postponed=(t.postponed||0)+1});save();toast('Moved to tomorrow');render()};
   const cd=$('#clearDemo');if(cd)cd.onclick=()=>{const s=seed();Object.keys(s).forEach(k=>{if(Array.isArray(s[k]))s[k]=[]});s.finance={income:0,savings:0,investments:0,ccBalance:0};s.pet={name:'Austin',vet:[],vaccines:[],grooming:{last:'',every:30},meds:[],food:{brand:'',remaining:''},supplies:[],dates:[],notes:''};s.calSources={personal:true,beise:true,work:true};s.demo=false;S=s;save();toast('Fresh start');render()};
 }
@@ -724,11 +826,11 @@ function renderTasks(){
   $('#s-tasks').innerHTML=`<h1>Tasks</h1>
   <div class="chips" style="margin-top:14px">${['today','upcoming','overdue','done'].map(f=>`<button class="chip ${taskFilter===f?'on':''}" data-f="${f}">${f[0].toUpperCase()+f.slice(1)}${counts[f]?`<span class="n">${counts[f]}</span>`:''}</button>`).join('')}</div>
   <div id="taskList" style="margin-top:8px">${list.length?list.map(taskHtml).join(''):`<div class="empty"><b>${emptyMsg[0]}</b>${emptyMsg[1]}</div>`}</div>
-  <div class="sec"><div class="sec-h"><h2>Reminders</h2></div>${S.reminders.filter(r=>!r.done).length?`<div class="card">${S.reminders.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>`<div class="li"><button class="cb" style="width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);flex:0 0 24px" data-rem="${r.id}" aria-label="Done"></button><div class="grow"><div class="t">${esc(r.title)}</div><div class="s">${relDay(r.date)}</div></div></div>`).join('')}</div>`:`<p class="muted small">No reminders set.</p>`}</div>
+  <div class="sec"><div class="sec-h"><h2>Reminders</h2></div>${S.reminders.filter(r=>!r.done).length?`<div class="card">${S.reminders.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>`<div class="li" data-del="reminders:${r.id}"><button class="cb" style="width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);flex:0 0 24px" data-rem="${r.id}" aria-label="Done"></button><div class="grow"><div class="t">${esc(r.title)}</div><div class="s">${relDay(r.date)}</div></div></div>`).join('')}</div>`:`<p class="muted small">No reminders set.</p>`}</div>
   <div class="sec"><div class="sec-h"><h2>Inbox</h2>${S.inbox.length?`<button id="sortAll">Sort with EA</button>`:''}</div>
     <p class="muted small">Brain dump anything. Sort it when you feel like it.</p>
     <div class="capture"><input id="inboxIn" placeholder="e.g. Need to book dentist"><button id="inboxAdd" aria-label="Add to inbox">+</button></div>
-    <div style="margin-top:10px">${S.inbox.length?S.inbox.map(i=>`<div class="inbox-item"><span class="t">${esc(i.text)}</span><button class="sort" data-sort="${i.id}">Sort</button></div>`).join(''):`<div class="empty" style="padding:20px"><b>Your inbox is clear.</b></div>`}</div></div>`;
+    <div style="margin-top:10px">${S.inbox.length?S.inbox.map(i=>`<div class="inbox-item" data-del="inbox:${i.id}"><span class="t">${esc(i.text)}</span><button class="sort" data-sort="${i.id}">Sort</button></div>`).join(''):`<div class="empty" style="padding:20px"><b>Your inbox is clear.</b></div>`}</div></div>`;
   $$('[data-f]').forEach(b=>b.onclick=()=>{taskFilter=b.dataset.f;renderTasks()});
   wireTasks($('#taskList'));
   $$('[data-rem]').forEach(b=>b.onclick=()=>{const r=S.reminders.find(x=>x.id===b.dataset.rem);r.done=true;save();toast('Done');render()});
@@ -739,24 +841,17 @@ function renderTasks(){
 }
 function taskHtml(t){
   const late=t.due&&t.due<today()&&!t.done;
-  return `<div class="swipe-wrap" data-id="${t.id}"><div class="swipe-bg">${t.done?'Reopen':'Done ✓'}</div><div class="task ${t.done?'done':''}">
+  return `<div class="task ${t.done?'done':''}" data-id="${t.id}" data-del="tasks:${t.id}" data-right="${t.done?'Reopen':'Done'}">
     <button class="cb" data-cb aria-label="Complete">${t.done?'✓':''}</button>
     <div class="grow"><div class="t ellip">${esc(t.title)}</div><div class="meta"><span>${t.cat}</span>${t.due?`<span class="${late?'late':''}">${late?'Overdue · ':''}${relDay(t.due)}</span>`:''}${t.rec?`<span>↻ ${t.rec}</span>`:''}</div></div>
-    <span class="pr ${t.pr}"></span></div></div>`;
+    <span class="pr ${t.pr}"></span></div>`;
 }
 function wireTasks(root){
   if(!root)return;
-  $$('.swipe-wrap',root).forEach(w=>{
-    const id=w.dataset.id,t=S.tasks.find(x=>x.id===id),card=$('.task',w);
-    $('[data-cb]',w).onclick=e=>{e.stopPropagation();toggleTask(t)};
-    card.onclick=()=>editTask(t);
-    let sx=0,dx=0,dragging=false;
-    card.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;dx=0;dragging=true;card.style.transition='none'},{passive:true});
-    card.addEventListener('touchmove',e=>{if(!dragging)return;dx=Math.max(0,e.touches[0].clientX-sx);card.style.transform=`translateX(${Math.min(dx,120)}px)`},{passive:true});
-    card.addEventListener('touchend',()=>{dragging=false;card.style.transition='';if(dx>80){card.style.transform='translateX(110%)';setTimeout(()=>toggleTask(t),160)}else card.style.transform=''});
-  });
+  $$('.task[data-id]',root).forEach(card=>{const t=S.tasks.find(x=>x.id===card.dataset.id);
+    $('[data-cb]',card).onclick=e=>{e.stopPropagation();toggleTask(t)};card.onclick=()=>editTask(t);card._onRight=()=>toggleTask(t)});
 }
-function toggleTask(t){t.done=!t.done;if(t.done&&t.rec){const n={...t,id:uid(),done:false,due:t.rec==='daily'?addDays(t.due||today(),1):t.rec==='weekly'?addDays(t.due||today(),7):(()=>{const d=new Date((t.due||today())+'T00:00:00');d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)})()};S.tasks.push(n)}save();toast(t.done?'Done':'Reopened');render()}
+function toggleTask(t){t.done=!t.done;if(t.done&&t.rec){const n={...t,id:uid(),done:false,due:t.rec==='daily'?addDays(t.due||today(),1):t.rec==='weekly'?addDays(t.due||today(),7):(()=>{const d=new Date((t.due||today())+'T00:00:00');d.setMonth(d.getMonth()+1);return isoLocal(d)})()};S.tasks.push(n)}save();toast(t.done?'Done':'Reopened');render()}
 
 /* ===================== CALENDAR ===================== */
 function renderCal(){
@@ -786,13 +881,13 @@ function renderCal(){
   <button class="btn soft block" style="margin-top:20px" id="addEv">+ New event</button>`;
   $$('[data-v]').forEach(b=>b.onclick=()=>{calView=b.dataset.v;renderCal()});
   $$('[data-sel]').forEach(b=>b.onclick=()=>{calSel=b.dataset.sel;renderCal()});
-  $$('[data-nav]').forEach(b=>b.onclick=()=>{const n=b.dataset.nav;if(n[0]==='m'){const d=new Date(calSel+'T00:00:00');d.setMonth(d.getMonth()+Number(n.slice(1)));calSel=d.toISOString().slice(0,10)}else calSel=addDays(calSel,Number(n));renderCal()});
+  $$('[data-nav]').forEach(b=>b.onclick=()=>{const n=b.dataset.nav;if(n[0]==='m'){const d=new Date(calSel+'T00:00:00');d.setMonth(d.getMonth()+Number(n.slice(1)));calSel=isoLocal(d)}else calSel=addDays(calSel,Number(n));renderCal()});
   $$('[data-ev]').forEach(b=>b.onclick=()=>{const id=b.dataset.ev;if(id.startsWith('d_'))return editDate(S.dates.find(x=>x.id===id.slice(2)));const own=S.events.find(x=>x.id===id);if(own)return editEvent(own);const g=SYNC.events.find(x=>x.id===id);if(g)showSynced(g)});
   $$('[data-src]').forEach(b=>b.onclick=()=>{S.calSources[b.dataset.src]=S.calSources[b.dataset.src]===false;save();renderCal()});
   const sn=$('#syncNow');if(sn)sn.onclick=()=>loadCalendar(true);
   $('#addEv').onclick=()=>editEvent();
 }
-const evHtml=e=>`<button class="ev ${e.src==='date'?'ev-date':''}" style="width:100%;text-align:left;${e.src&&SRC[e.src]?`border-left-color:${SRC[e.src].c}`:''}" data-ev="${e.id}"><time>${fmtTime(e.time)||'All day'}</time><div><div class="t">${esc(e.title)}</div>${e.loc||(e.src&&SRC[e.src])?`<div class="loc">${e.src&&SRC[e.src]?SRC[e.src].n+(e.loc?' · ':''):''}${esc(e.loc)}</div>`:''}</div></button>`;
+const evHtml=e=>`<button class="ev ${e.src==='date'?'ev-date':''}" ${e.src==='date'?`data-del="dates:${e.ref}"`:S.events.some(x=>x.id===e.id)?`data-del="events:${e.id}"`:''} style="width:100%;text-align:left;${e.src&&SRC[e.src]?`border-left-color:${SRC[e.src].c}`:''}" data-ev="${e.id}"><time>${fmtTime(e.time)||'All day'}</time><div><div class="t">${esc(e.title)}</div>${e.loc||(e.src&&SRC[e.src])?`<div class="loc">${e.src&&SRC[e.src]?SRC[e.src].n+(e.loc?' · ':''):''}${esc(e.loc)}</div>`:''}</div></button>`;
 function syncLine(){if(!REMOTE)return'';const ago=SYNC.at?Math.round((Date.now()-SYNC.at)/60000):null;return `<div class="row between" style="margin-top:12px"><div class="chips" style="margin:0;padding:0;flex:1">${Object.entries(SRC).map(([k,v])=>`<button class="chip ${S.calSources[k]!==false?'on':''}" data-src="${k}" style="height:32px;font-size:13px"><i class="srcdot" style="background:${v.c}"></i>${v.n}</button>`).join('')}</div><button class="small muted" id="syncNow" style="flex:0 0 auto;margin-left:8px">${SYNC.loading?'Syncing…':SYNC.errors.length?'Sync issue · retry':ago===null?'Sync now':ago<1?'Just synced':`Synced ${ago} min ago`}</button></div>`}
 
 /* ===================== LIFE ===================== */
@@ -803,7 +898,7 @@ function renderLife(){
     const vet=S.pet.vet.filter(v=>daysUntil(v.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))[0];
     el.innerHTML=`<h1>Life</h1><p class="muted" style="margin-top:4px">Everything that isn't work.</p>
     <div class="hub">
-      <button class="fin" data-p="finance"><span class="ic">₱</span><div><b>Finance</b><span>${PESO(monthSpend())} spent this month${payNext?`<br>${esc(payNext.title)} due ${relDay(payNext.date)}`:''}</span></div></button>
+      ${FIN?`<button class="fin" data-p="finance"><span class="ic">₱</span><div><b>Finance</b><span>${PESO(monthSpend())} spent this month${payNext?`<br>${esc(payNext.title)} due ${relDay(payNext.date)}`:''}</span></div></button>`:''}
       <button class="trv" data-p="travel"><span class="ic">✈︎</span><div><b>Travel</b><span>${tr?`${tr.dest} in ${daysUntil(tr.start)} days`:'No upcoming trips yet'}</span></div></button>
       <button class="shp" data-p="shopping"><span class="ic">⊕</span><div><b>Shopping</b><span>${need?`${need} thing${need>1?'s':''} to buy`:'Nothing to buy right now'}</span></div></button>
       <button class="hom" data-p="home"><span class="ic">⌂</span><div><b>Home</b><span>${S.home.filter(h=>h.status==='open').length} open item${S.home.filter(h=>h.status==='open').length===1?'':'s'}</span></div></button>
@@ -837,7 +932,7 @@ function renderFinance(){
 }
 function renderTravel(){
   const up=S.trips.filter(t=>t.status==='upcoming'),pot=S.trips.filter(t=>t.status==='potential');
-  const card=t=>`<button class="trip-card" data-trip="${t.id}"><span class="flag">${t.flag}</span><h3>${esc(t.dest)}</h3><div class="small muted">${t.start?`${fmtShort(t.start)} – ${fmtShort(t.end)}`:'Dates open'}</div>${t.start?`<span class="cd">${daysUntil(t.start)>=0?daysUntil(t.start)+' days away':'Happened'}</span>`:''}</button>`;
+  const card=t=>`<button class="trip-card" data-trip="${t.id}" data-del="trips:${t.id}"><span class="flag">${t.flag}</span><h3>${esc(t.dest)}</h3><div class="small muted">${t.start?`${fmtShort(t.start)} – ${fmtShort(t.end)}`:'Dates open'}</div>${t.start?`<span class="cd">${daysUntil(t.start)>=0?daysUntil(t.start)+' days away':'Happened'}</span>`:''}</button>`;
   return `<h1>Travel</h1><div class="sec"><div class="sec-h"><h2>Upcoming</h2></div>${up.map(card).join('')||'<div class="card blue"><b>No upcoming trips yet.</b><p class="small muted">Somewhere on your mind?</p></div>'}</div>
   <div class="sec"><div class="sec-h"><h2>Potential</h2></div>${pot.map(card).join('')||'<p class="muted small">Nothing brewing.</p>'}</div>
   <button class="btn soft block" style="margin-top:20px" id="addTrip">+ New trip</button>`;
@@ -872,15 +967,15 @@ function editTrip(t){
   const d=$('#del',el);if(d)d.onclick=()=>{S.trips=S.trips.filter(x=>x.id!==t.id);save();closeSheet();lifePage='travel';render()}});
 }
 function renderShopping(){
-  const grp=(st,title)=>{const items=S.shopping.filter(s=>s.status===st);return `<div class="sec"><div class="sec-h"><h2>${title}</h2><button data-shop-new="${st}">+ Add</button></div>${items.length?`<div class="card">${items.map(s=>`<button class="li" style="width:100%;text-align:left" data-shop="${s.id}"><div class="grow"><div class="t">${esc(s.name)}</div><div class="s">${s.cat}${s.notes?' · '+esc(s.notes):''}${s.date?' · by '+fmtShort(s.date):''}</div></div>${s.price?`<span class="amt">${PESO(s.price)}</span>`:''}</button>`).join('')}</div>`:`<p class="muted small">Nothing here.</p>`}</div>`};
+  const grp=(st,title)=>{const items=S.shopping.filter(s=>s.status===st);return `<div class="sec"><div class="sec-h"><h2>${title}</h2><button data-shop-new="${st}">+ Add</button></div>${items.length?`<div class="card">${items.map(s=>`<button class="li" style="width:100%;text-align:left" data-shop="${s.id}" data-del="shopping:${s.id}"><div class="grow"><div class="t">${esc(s.name)}</div><div class="s">${s.cat}${s.notes?' · '+esc(s.notes):''}${s.date?' · by '+fmtShort(s.date):''}</div></div>${s.price?`<span class="amt">${PESO(s.price)}</span>`:''}</button>`).join('')}</div>`:`<p class="muted small">Nothing here.</p>`}</div>`};
   return `<h1>Shopping</h1>${grp('need','Need to buy')}${grp('wishlist','Wishlist')}${grp('watch','Price watch')}${grp('purchased','Purchased')}`;
 }
 function renderHomeAdmin(){
   const open=S.home.filter(h=>h.status!=='done');
   return `<h1>Home</h1><p class="muted" style="margin-top:4px">Repairs, projects, and the little things.</p>
-  <div class="sec">${open.length?`<div class="card">${open.map(h=>`<button class="li" style="width:100%;text-align:left" data-home="${h.id}"><span class="ic">${{repair:'🔧',maintenance:'🧹',idea:'💡',project:'🪴',purchase:'🛒',supplies:'🧻'}[h.kind]||'⌂'}</span><div class="grow"><div class="t">${esc(h.title)}</div><div class="s">${h.kind}${h.notes?' · '+esc(h.notes):''}</div></div></button>`).join('')}</div>`:'<div class="empty"><b>Nothing on the home list.</b>House is handling itself.</div>'}
+  <div class="sec">${open.length?`<div class="card">${open.map(h=>`<button class="li" style="width:100%;text-align:left" data-home="${h.id}" data-del="home:${h.id}"><span class="ic">${{repair:'🔧',maintenance:'🧹',idea:'💡',project:'🪴',purchase:'🛒',supplies:'🧻'}[h.kind]||'⌂'}</span><div class="grow"><div class="t">${esc(h.title)}</div><div class="s">${h.kind}${h.notes?' · '+esc(h.notes):''}</div></div></button>`).join('')}</div>`:'<div class="empty"><b>Nothing on the home list.</b>House is handling itself.</div>'}
   <button class="btn soft block" style="margin-top:14px" id="addHome">+ Add home item</button></div>
-  ${S.home.filter(h=>h.status==='done').length?`<div class="sec"><div class="sec-h"><h2>Done</h2></div><div class="card cream">${S.home.filter(h=>h.status==='done').map(h=>`<button class="li" style="width:100%;text-align:left" data-home="${h.id}"><div class="grow muted">${esc(h.title)}</div></button>`).join('')}</div></div>`:''}`;
+  ${S.home.filter(h=>h.status==='done').length?`<div class="sec"><div class="sec-h"><h2>Done</h2></div><div class="card cream">${S.home.filter(h=>h.status==='done').map(h=>`<button class="li" style="width:100%;text-align:left" data-home="${h.id}" data-del="home:${h.id}"><div class="grow muted">${esc(h.title)}</div></button>`).join('')}</div></div>`:''}`;
 }
 function renderAustin(){
   const p=S.pet;const nextVet=p.vet.filter(v=>daysUntil(v.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))[0];
@@ -906,19 +1001,19 @@ function editPet(){
 }
 function renderWishlist(){
   return `<h1>Wishlist</h1><p class="muted" style="margin-top:4px">Things you'd love, eventually.</p>
-  <div class="sec">${S.wishlist.length?`<div class="card">${S.wishlist.map(w=>`<button class="li" style="width:100%;text-align:left" data-wish="${w.id}"><span class="ic">${{product:'✧',experience:'✨',restaurant:'🍽',trip:'✈️',hobby:'🎨','future plan':'☁️'}[w.kind]||'✧'}</span><div class="grow"><div class="t">${esc(w.name)}</div><div class="s">${w.kind} · ${w.pr} priority${w.date?' · '+fmtShort(w.date):''}${w.notes?' · '+esc(w.notes):''}</div></div>${w.cost?`<span class="amt">${PESO(w.cost)}</span>`:''}</button>`).join('')}</div>`:'<div class="empty"><b>Empty wishlist.</b>Suspicious. Add something.</div>'}
+  <div class="sec">${S.wishlist.length?`<div class="card">${S.wishlist.map(w=>`<button class="li" style="width:100%;text-align:left" data-wish="${w.id}" data-del="wishlist:${w.id}"><span class="ic">${{product:'✧',experience:'✨',restaurant:'🍽',trip:'✈️',hobby:'🎨','future plan':'☁️'}[w.kind]||'✧'}</span><div class="grow"><div class="t">${esc(w.name)}</div><div class="s">${w.kind} · ${w.pr} priority${w.date?' · '+fmtShort(w.date):''}${w.notes?' · '+esc(w.notes):''}</div></div>${w.cost?`<span class="amt">${PESO(w.cost)}</span>`:''}</button>`).join('')}</div>`:'<div class="empty"><b>Empty wishlist.</b>Suspicious. Add something.</div>'}
   <button class="btn soft block" style="margin-top:14px" id="addWish">+ Add a wish</button></div>`;
 }
 function renderDates(){
-  const list=S.dates.map(d=>({d,iso:nextOccur(d)})).sort((a,b)=>a.iso.localeCompare(b.iso));
-  return `<h1>Dates</h1><p class="muted" style="margin-top:4px">The ones that matter, every year.</p>
-  <div class="sec">${list.length?`<div class="card">${list.map(({d,iso})=>`<button class="li" style="width:100%;text-align:left" data-date="${d.id}"><span class="ic">${DTYPES[d.type]||'♡'}</span><div class="grow"><div class="t">${esc(d.name)}</div><div class="s">${fmtDate(iso,{month:'long',day:'numeric'})} · ${relDay(iso)}${dateAge(d)?' · '+dateAge(d):''}${d.notes?' · '+esc(d.notes):''}</div></div>${daysUntil(iso)<=7?'<span class="tag important">soon</span>':''}</button>`).join('')}</div>`:'<div class="empty"><b>No dates yet.</b>Add the people you don\'t want to forget.</div>'}
+  const list=S.dates.map(d=>{const lo=lastOccur(d);return {d,iso:nextOccur(d),lo,ago:lo?-daysUntil(lo):0}}).map(x=>({...x,recent:x.ago>0&&x.ago<=(isMonthly(x.d)?3:14)})).sort((a,b)=>(b.recent-a.recent)||(a.recent?a.ago-b.ago:a.iso.localeCompare(b.iso)));
+  return `<h1>Dates</h1><p class="muted" style="margin-top:4px">The ones that matter, every time they come around.</p>
+  <div class="sec">${list.length?`<div class="card">${list.map(({d,iso,lo,ago,recent})=>`<button class="li" style="width:100%;text-align:left" data-date="${d.id}" data-del="dates:${d.id}"><span class="ic">${DTYPES[d.type]||'♡'}</span><div class="grow"><div class="t">${esc(d.name)}</div><div class="s">${recent?`${ago===1?'Yesterday':ago+' days ago'}${dateAge(d,lo)?' · '+dateAge(d,lo):''} · next ${fmtShort(iso)}`:`${fmtDate(iso,{month:'long',day:'numeric'})} · ${inWhen(iso)}${dateAge(d,iso)?' · '+dateAge(d,iso):''}`}${isMonthly(d)?' · monthly':''}${d.notes?' · '+esc(d.notes):''}</div></div>${daysUntil(iso)<=7?'<span class="tag important">soon</span>':''}</button>`).join('')}</div>`:'<div class="empty"><b>No dates yet.</b>Add the people you don\'t want to forget.</div>'}
   <button class="btn soft block" style="margin-top:14px" id="addDate">+ Add a date</button></div>`;
 }
 function renderNotes(){
   const cats=[...new Set(S.notes.map(n=>n.cat))];
   return `<h1>Notes</h1><div class="capture"><input id="noteQuick" placeholder="Quick thought"><button id="noteQuickAdd" aria-label="Save note">+</button></div>
-  <div class="sec">${S.notes.length?S.notes.map(n=>`<button class="note" style="width:100%;text-align:left;display:block" data-note="${n.id}"><div class="t">${esc(n.title)}</div>${n.body?`<p>${esc(n.body)}</p>`:''}<span class="tag">${esc(n.cat)}</span></button>`).join(''):'<div class="empty"><b>No notes yet.</b>Catch a thought before it goes.</div>'}</div>
+  <div class="sec">${S.notes.length?S.notes.map(n=>`<button class="note" style="width:100%;text-align:left;display:block" data-note="${n.id}" data-del="notes:${n.id}"><div class="t">${esc(n.title)}</div>${n.body?`<p>${esc(n.body)}</p>`:''}<span class="tag">${esc(n.cat)}</span></button>`).join(''):'<div class="empty"><b>No notes yet.</b>Catch a thought before it goes.</div>'}</div>
   <button class="btn soft block" style="margin-top:14px" id="addNote">+ Full note</button>`;
 }
 function wireLife(el,page){
@@ -950,7 +1045,7 @@ function wireLife(el,page){
 function renderEA(){
   const el=$('#s-ea');
   el.innerHTML=`<div class="ea"><div class="ea-head"><span class="star">✦</span><div><h2>Your EA</h2><p>Works only from what's stored in this app.</p></div></div>
-  <div class="prompts">${['Plan my day',"What's urgent?","What's coming up?","What am I forgetting?",'Organize my inbox','Plan my week','What did I spend the most on?'].map(p=>`<button data-q="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+  <div class="prompts">${[...(new Date().getDay()===0?['Sunday reset']:[]),'Plan my day',"What's urgent?","What's coming up?","What am I forgetting?",'Organize my inbox','Plan my week'].concat(FIN?['What did I spend the most on?']:[]).map(p=>`<button data-q="${esc(p)}">${esc(p)}</button>`).join('')}</div>
   <div class="msgs" id="msgs">${S.chat.length?S.chat.map(msgHtml).join(''):`<div class="msg ea-m">Hi Chloe. Ask me about your day, your money, Austin, your trips — or tell me to add something. I only answer from what you've stored here, so I won't make things up.</div>`}</div>
   <div class="ea-input"><input id="eaIn" placeholder="Ask or tell me something" autocomplete="off"><button id="eaSend" aria-label="Send">↑</button></div></div>`;
   $$('[data-q]',el).forEach(b=>b.onclick=()=>handleEA(b.dataset.q));
@@ -976,7 +1071,7 @@ function runAction(a){
   if(k==='addEvent'){S.events.push({id:uid(),title:p.title,date:p.date,time:p.time||'',loc:'',notes:'Added by EA',remind:''});toast('Event added')}
   if(k==='sortInbox'){convertInboxSilently(p.id,p.kind)}
   if(k==='addPacking'){const t=S.trips.find(x=>x.id===p);if(t&&!t.packing.length){t.packing=['Passport','Charger','Toiletries','Outfits','Medicines'].map(x=>({t:x,d:false}));toast('Starter packing list added')}}
-  if(k==='addDate'){S.dates.push({id:uid(),name:p.name,type:p.type,month:p.month,day:p.day,year:'',notes:''});toast('Date saved')}
+  if(k==='addDate'){S.dates.push({id:uid(),name:p.name,type:p.type,month:p.month,day:p.day,year:'',notes:'',repeat:p.repeat||'yearly'});toast('Date saved')}
   if(k==='openInbox'){taskFilter='today';go('tasks');setTimeout(()=>window.scrollTo({top:document.body.scrollHeight}),100)}
   if(k==='go'){if(p.life){lifePage=p.life}go(p.tab)}
   save();
@@ -999,17 +1094,18 @@ function handleEA(q){
 const parseDate=s=>{s=s.toLowerCase();if(/\btoday\b/.test(s))return today();if(/\btomorrow\b/.test(s))return addDays(today(),1);
   const dow=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];for(let i=0;i<7;i++)if(s.includes(dow[i])){const d=new Date();let diff=(i-d.getDay()+7)%7||7;return addDays(today(),diff)}
   const m=s.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(\d{1,2})?/);if(m){const mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[1]);let y=new Date().getFullYear();if(mi<new Date().getMonth())y++;const day=m[2]?Number(m[2]):1;return `${y}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`}
-  if(/next month/.test(s)){const d=new Date();d.setMonth(d.getMonth()+1,1);return d.toISOString().slice(0,10)}if(/next week/.test(s))return addDays(today(),7);const n=s.match(/in (\d+) days?/);if(n)return addDays(today(),Number(n[1]));return null};
+  if(/next month/.test(s)){const d=new Date();d.setMonth(d.getMonth()+1,1);return isoLocal(d)}if(/next week/.test(s))return addDays(today(),7);const n=s.match(/in (\d+) days?/);if(n)return addDays(today(),Number(n[1]));return null};
 const parseTime=s=>{const m=s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);if(!m)return'';let h=Number(m[1]);if(m[3].toLowerCase()==='pm'&&h<12)h+=12;if(m[3].toLowerCase()==='am'&&h===12)h=0;return `${String(h).padStart(2,'0')}:${m[2]||'00'}`};
 const parsePeso=s=>{const m=s.replace(/,/g,'').match(/(?:₱|php|around|about)?\s*(\d{3,7})\b/i);return m?Number(m[1]):0};
 
 function answer(q){
   const l=q.toLowerCase();
   const od=overdue(),dt=dueToday(),evs=remainingEvents(),tr=upcomingTrip();
-  if(/^(add|save)\b.*\b(birthday|anniversary|gotcha)/.test(l)){const type=/anniversar/.test(l)?'anniversary':/gotcha/.test(l)?'gotcha day':'birthday';const d=parseDate(l);const name=q.replace(/^(add|save)\s+/i,'').replace(/['’]s\s+(birthday|anniversary|gotcha day).*$/i,'').replace(/\s+(birthday|anniversary|gotcha day).*$/i,'').trim();
-    if(!d)return {text:`What date is ${name}'s ${type}? Say it like “add ${name}'s ${type} March 14”.`,label:'Assumption'};const[,m,dd]=d.split('-').map(Number);
-    return {text:`${name} — ${type}, ${fmtDate(d,{month:'long',day:'numeric'})}, every year. Save it?`,label:'Action',actions:[{label:'Save date',kind:'addDate',payload:{name,type,month:m,day:dd}}]};}
-  if(/birthday|anniversar|important date|dates/.test(l)){const u=upcomingDates(/month/.test(l)?31:60);if(!u.length)return {text:'No important dates in the next two months.',label:'Stored'};return {text:`Coming up:`,label:'Stored',cards:u.map(({d,iso})=>({t:`${d.name} — ${d.type}`,s:`${fmtDate(iso,{month:'long',day:'numeric'})} · ${relDay(iso)}${dateAge(d)?' · '+dateAge(d):''}${d.notes?' · '+d.notes:''}`}))};}
+  if(/^(add|save)\b.*\b(birthday|anniversary|monthsary|gotcha)/.test(l)){const monthly=/monthsar/.test(l);const type=/anniversar|monthsar/.test(l)?'anniversary':/gotcha/.test(l)?'gotcha day':'birthday';const d=parseDate(l);let name=q.replace(/^(add|save)\s+/i,'').replace(/['’]s\s+(birthday|anniversary|monthsary|gotcha day).*$/i,'').replace(/\s+(birthday|anniversary|monthsary|gotcha day).*$/i,'').trim();let nm0=name.replace(/^(our|my)\s*/i,'');if(!nm0)nm0='Us';const name2=nm0;
+    if(!d)return {text:`What date is ${name2}'s ${type}? Say it like “add ${name2}'s ${type} March 14”.`,label:'Assumption'};const[,m,dd]=d.split('-').map(Number);
+    const ord=n=>n+([11,12,13].includes(n%100)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th'));
+    return {text:`${name2} — ${monthly?'monthsary':type}, ${monthly?`the ${ord(dd)} of every month`:fmtDate(d,{month:'long',day:'numeric'})+', every year'}. Save it?${monthly?' Add the start year after so I can count the months.':''}`,label:'Action',actions:[{label:'Save date',kind:'addDate',payload:{name:name2,type,month:m,day:dd,repeat:monthly?'monthly':'yearly'}}]};}
+  if(/birthday|anniversar|monthsar|important date|dates/.test(l)){const u=upcomingDates(/month/.test(l)?31:60);if(!u.length)return {text:'No important dates in the next two months.',label:'Stored'};return {text:`Coming up:`,label:'Stored',cards:u.map(({d,iso})=>({t:`${d.name} — ${kindLabel(d,iso)}`,s:`${fmtDate(iso,{month:'long',day:'numeric'})} · ${relDay(iso)}${dateAge(d,iso)?' · '+dateAge(d,iso):''}${d.notes?' · '+d.notes:''}`}))};}
   // ---- create / add intents
   if(/^(add|put|create|make)\b.*\b(wishlist|wish list)/.test(l)||/\bto my wishlist\b/.test(l)){
     const name=q.replace(/^(add|put|create|make)\s+/i,'').replace(/\s*(to|on|in)\s+(my\s+)?wish\s*list.*$/i,'').replace(/\s*(around|about|for)\s*₱?\d[\d,]*.*$/i,'').trim();const cost=parsePeso(q);
@@ -1029,23 +1125,24 @@ function answer(q){
   if(/^(add|create|new)\b.*\btask\b/.test(l)||/^(add|i need to|need to|todo|to do)\b/.test(l)){
     const d=parseDate(l);const title=q.replace(/^(add|create|new)\s+(a\s+)?(task\s*)?(to\s+)?/i,'').replace(/^(i need to|need to|todo|to do)\s+/i,'').replace(/\s*(by|on|for|due)\s+(tomorrow|today|next \w+|\w+day|in \d+ days?).*$/i,'').replace(/\s*(tomorrow|today)$/i,'').trim();
     return {text:`Task: “${title}”${d?`, due ${relDay(d)}`:''}. Add it?`,label:'Action',actions:[{label:'Add task',kind:'addTask',payload:{title,due:d||'',cat:guessCat(title)}}]};}
+  if(/sunday reset|weekly reset|reset my week|weekly review/.test(l)){setTimeout(openReset,250);return {text:'Opening your Sunday reset: leftovers first, then inbox, then next week.',label:''};}
   // ---- inbox
   if(/inbox|organi[sz]e|sort/.test(l)){
     if(!S.inbox.length)return {text:'Your inbox is clear. Nothing to sort.',label:'Stored'};
     const sug=S.inbox.map(i=>{const t=i.text.toLowerCase();let kind='task';if(/^(maybe|trip)|\b(in\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*)\b/.test(t)&&!/buy|book/.test(t))kind='trip';else if(/^(buy|get|order)\b|new\s+\w+$/.test(t))kind='shop';else if(/^(save|remember)\b|place|cafe|restaurant|ramen/.test(t))kind='note';return {i,kind}});
     return {text:`${S.inbox.length} unsorted items. Here's how I'd file them — tap to confirm each one:`,label:'Suggestion',cards:sug.map(s=>({t:s.i.text,s:'→ '+{task:'Task',shop:'Shopping',note:'Note',trip:'Trip (potential)'}[s.kind]})),actions:sug.map(s=>({label:`${s.i.text.slice(0,22)}${s.i.text.length>22?'…':''} → ${s.kind}`,kind:'sortInbox',payload:{id:s.i.id,kind:s.kind}}))};}
   // ---- spending
-  if(/spen[dt]|expense|money|budget/.test(l)&&!/bill|payment|due/.test(l)){
+  if(FIN&&/spen[dt]|expense|money|budget/.test(l)&&!/bill|payment|due/.test(l)){
     const by={};monthExpenses().forEach(e=>by[e.cat]=(by[e.cat]||0)+Number(e.amt));const top=Object.entries(by).sort((a,b)=>b[1]-a[1]);
     if(!top.length)return {text:'No expenses logged this month yet.',label:'Stored'};
     return {text:`You've spent ${PESO(monthSpend())} this month. Most of it went to ${top[0][0]} (${PESO(top[0][1])})${top[1]?`, then ${top[1][0]} (${PESO(top[1][1])})`:''}.${S.finance.income?` That's ${Math.round(monthSpend()/S.finance.income*100)}% of your income.`:''}`,label:'Stored',actions:[{label:'Open finance',kind:'go',payload:{tab:'life',life:'finance'}}]};}
-  if(/bill|payment|due|card/.test(l)&&/what|which|when|coming|next|upcoming|do i/.test(l)){
+  if(FIN&&/bill|payment|due|card/.test(l)&&/what|which|when|coming|next|upcoming|do i/.test(l)){
     const ps=S.payments.filter(p=>daysUntil(p.date)>=0).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
     if(!ps.length)return {text:'No upcoming payments stored.',label:'Stored'};
     return {text:`Coming up: ${ps.map(p=>`${p.title} ${PESO(p.amt)} ${relDay(p.date)}`).join(', ')}. Total ${PESO(ps.reduce((s,p)=>s+p.amt,0))}.`,label:'Stored'};}
   // ---- urgent / priorities
   if(/urgent|priorit|first|start with|most important/.test(l)){
-    const items=[];od.forEach(t=>items.push({t:t.title,s:`Overdue by ${-daysUntil(t.due)} day${-daysUntil(t.due)>1?'s':''}`,id:t.id}));S.payments.filter(p=>daysUntil(p.date)>=0&&daysUntil(p.date)<=1).forEach(p=>items.push({t:p.title,s:`${PESO(p.amt)} due ${relDay(p.date)}`}));dt.filter(t=>t.pr==='high').forEach(t=>items.push({t:t.title,s:'High priority, due today',id:t.id}));
+    const items=[];od.forEach(t=>items.push({t:t.title,s:`Overdue by ${-daysUntil(t.due)} day${-daysUntil(t.due)>1?'s':''}`,id:t.id}));(FIN?S.payments:[]).filter(p=>daysUntil(p.date)>=0&&daysUntil(p.date)<=1).forEach(p=>items.push({t:p.title,s:`${PESO(p.amt)} due ${relDay(p.date)}`}));dt.filter(t=>t.pr==='high').forEach(t=>items.push({t:t.title,s:'High priority, due today',id:t.id}));
     if(!items.length)return {text:'Nothing is on fire. Everything due is either today-and-light or further out.',label:'Stored'};
     return {text:`I'd start here:`,label:'Suggestion',cards:items,actions:items.filter(i=>i.id).map(i=>({label:`Done: ${i.t.slice(0,20)}`,kind:'doneTask',payload:i.id}))};}
   // ---- forgetting / putting off / waiting on
@@ -1063,7 +1160,7 @@ function answer(q){
     return {text:`${isToday?'Today':fmtDate(d,{weekday:'long'})}: ${tasks.length?`${tasks.length} task${tasks.length>1?'s':''}`:'no tasks'}${ev.length?`, ${ev.length} event${ev.length>1?'s':''}`:''}${rems.length?`, ${rems.length} reminder${rems.length>1?'s':''}`:''}.${lead?` I'd knock out “${lead.title}” first${lead.due<today()?' since it\'s overdue':''}.`:''}${ev[0]&&isToday?` Then you're free until ${ev[0].title.toLowerCase()} at ${fmtTime(ev[0].time)}.`:''}`,label:'Stored + suggestion',cards,actions:tasks.slice(0,3).map(t=>({label:`Done: ${t.title.slice(0,18)}`,kind:'doneTask',payload:t.id}))};}
   // ---- week / coming up
   if(/week|coming up|upcoming|ahead|next few days|summar/.test(l)){
-    const end=addDays(today(),7);const ev=[...S.events,...syncedEvents()].filter(e=>e.date>=today()&&e.date<=end).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));const tk=openTasks().filter(t=>t.due&&t.due>=today()&&t.due<=end).sort((a,b)=>a.due.localeCompare(b.due));const pay=S.payments.filter(p=>daysUntil(p.date)>=0&&daysUntil(p.date)<=7);const ud=upcomingDates(7);
+    const end=addDays(today(),7);const ev=[...S.events,...syncedEvents()].filter(e=>e.date>=today()&&e.date<=end).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));const tk=openTasks().filter(t=>t.due&&t.due>=today()&&t.due<=end).sort((a,b)=>a.due.localeCompare(b.due));const pay=(FIN?S.payments:[]).filter(p=>daysUntil(p.date)>=0&&daysUntil(p.date)<=7);const ud=upcomingDates(7);
     const cards=[...ev.map(e=>({t:e.title,s:`${relDay(e.date)} · ${fmtTime(e.time)||'All day'}${e.src&&SRC[e.src]?' · '+SRC[e.src].n:''}`})),...ud.map(({d,iso})=>({t:`${DTYPES[d.type]} ${d.name} — ${d.type}`,s:relDay(iso)})),...tk.map(t=>({t:t.title,s:`Task · ${relDay(t.due)}`})),...pay.map(p=>({t:p.title,s:`${PESO(p.amt)} · ${relDay(p.date)}`}))];
     if(!cards.length)return {text:'The next seven days are empty in here. Nothing scheduled, nothing due.',label:'Stored'};
     return {text:`This week: ${ev.length} event${ev.length===1?'':'s'}, ${tk.length} task${tk.length===1?'':'s'} due${pay.length?`, ${pay.length} payment${pay.length>1?'s':''} (${PESO(pay.reduce((s,p)=>s+p.amt,0))})`:''}${tr&&daysUntil(tr.start)<=7?`, and ${tr.dest} starts ${relDay(tr.start)}`:''}.${od.length?` Plus ${od.length} overdue from before.`:''}`,label:'Stored',cards};}
@@ -1083,8 +1180,36 @@ function answer(q){
   if(/note|remember|cafe|restaurant/.test(l)){const ns=S.notes.filter(n=>l.split(' ').some(w=>w.length>3&&(n.title+n.body+n.cat).toLowerCase().includes(w)));return {text:ns.length?`Found ${ns.length} note${ns.length>1?'s':''}:`:'No matching notes. Want me to save one?',label:'Stored',cards:ns.map(n=>({t:n.title,s:n.body}))};}
   if(/home|house|repair|fix/.test(l)){const h=S.home.filter(x=>x.status!=='done');return {text:h.length?`Home list: ${h.map(x=>x.title).join('; ')}.`:'Nothing open on the home list.',label:'Stored'};}
   if(/^(hi|hello|hey|thanks|thank you)/.test(l))return {text:/thank/.test(l)?'Anytime.':`Hi. ${daySummary().h} ${daySummary().b}`,label:''};
-  return {text:"I didn't catch that. I can tell you about today, this week, what's urgent, bills, spending, Austin, trips, your inbox — or add tasks, reminders, events, wishes and trips if you phrase it like “Add … to my wishlist” or “Remind me to … next week”.",label:'Assumption'};
+  return {text:"I didn't catch that. I can tell you about today, this week, what's urgent, important dates, Austin, trips, your inbox — or add tasks, reminders, events, wishes and trips if you phrase it like “Add … to my wishlist” or “Remind me to … next week”.",label:'Assumption'};
 }
+
+/* ===================== SWIPE ROWS ===================== */
+// Swipe left on any [data-del] row to reveal Delete. Rows with a _onRight handler (tasks) also swipe right to complete.
+const DEL_W=84;let openRow=null;
+function closeRow(w){if(!w)return;w._set(0,true);if(openRow===w)openRow=null}
+function delItem(spec){const[coll,id]=spec.split(':');if(!Array.isArray(S[coll]))return;S[coll]=S[coll].filter(x=>x.id!==id);save();toast('Deleted');render()}
+function wrapSwipe(row){
+  if(row.parentNode&&row.parentNode.classList&&row.parentNode.classList.contains('sw'))return;
+  const w=document.createElement('div');w.className='sw '+(row.classList.contains('li')?'inline':'stack');
+  const del=document.createElement('button');del.className='sw-del';del.type='button';del.textContent='Delete';del.setAttribute('aria-label','Delete');
+  const right=document.createElement('div');right.className='sw-right';right.textContent=row.dataset.right||'';
+  row.parentNode.insertBefore(w,row);w.append(right,del,row);row.classList.add('sw-row');
+  let x0=0,y0=0,off=0,base=0,mode=null,moved=false,pid=null;
+  w._set=(v,anim)=>{off=v;row.style.transition=anim?'transform .2s ease':'none';del.style.transition=right.style.transition=anim?'width .2s ease':'none';
+    row.style.transform=v?`translateX(${v}px)`:'';del.style.width=Math.max(0,-v)+'px';right.style.width=Math.max(0,v)+'px'};
+  row.addEventListener('pointerdown',e=>{if(e.button)return;if(openRow&&openRow!==w)closeRow(openRow);x0=e.clientX;y0=e.clientY;base=off;mode=null;moved=false;pid=e.pointerId});
+  row.addEventListener('pointermove',e=>{if(e.pointerId!==pid)return;const dx=e.clientX-x0,dy=e.clientY-y0;
+    if(!mode){if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){mode='h';moved=true;try{row.setPointerCapture(pid)}catch(_){}}else if(Math.abs(dy)>8){mode='v';return}else return}
+    if(mode!=='h')return;let v=base+dx;const maxR=row._onRight?110:0;v=Math.max(-DEL_W-24,Math.min(maxR,v));w._set(v)});
+  const end=e=>{if(e.pointerId!==pid)return;pid=null;if(mode!=='h'){mode=null;return}mode=null;
+    if(off<-DEL_W/2){w._set(-DEL_W,true);openRow=w}else if(row._onRight&&off>80){w._set(0,true);row._onRight()}else closeRow(w)};
+  row.addEventListener('pointerup',end);row.addEventListener('pointercancel',end);
+  // swallow the click that ends a swipe, and taps on an open row just close it
+  w.addEventListener('click',e=>{if(e.target.closest('.sw-del'))return;if(moved){e.stopPropagation();e.preventDefault();moved=false;return}if(off){e.stopPropagation();e.preventDefault();closeRow(w)}},true);
+  del.addEventListener('click',e=>{e.stopPropagation();openRow=null;delItem(row.dataset.del)});
+}
+new MutationObserver(()=>$$('[data-del]').forEach(r=>{if(!r.closest('.sw'))wrapSwipe(r)})).observe(document.getElementById('app'),{childList:true,subtree:true});
+document.addEventListener('pointerdown',e=>{if(openRow&&!openRow.contains(e.target))closeRow(openRow)},true);
 
 /* ===================== RENDER ===================== */
 function render(){
@@ -1092,6 +1217,7 @@ function render(){
   ({home:renderHome,tasks:renderTasks,cal:renderCal,life:renderLife,ea:renderEA})[tab]();
 }
 render();loadRemote().then(()=>loadCalendar(false));
+if(REMOTE&&'serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 setInterval(()=>{if(REMOTE&&document.visibilityState==='visible')loadCalendar(false)},10*60*1000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&REMOTE&&Date.now()-SYNC.at>5*60*1000)loadCalendar(false)});
 </script>

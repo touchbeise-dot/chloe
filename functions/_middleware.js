@@ -1,4 +1,4 @@
-// Runs before every request. Only /<APP_SECRET> and /<APP_SECRET>/api/* are reachable;
+// Runs before every request. Only /<APP_SECRET>/, its app files and /<APP_SECRET>/api/* are reachable;
 // everything else (including /index.html) returns 404.
 import { parseICS, CAL_TTL } from '../lib/ics.js';
 
@@ -16,6 +16,16 @@ export async function onRequest({ request, env }) {
   if (rest === '') {
     const r = await env.ASSETS.fetch(new URL('/', url));
     return new Response(r.body, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
+
+  // Home-screen app files live under the secret path too, so the icon and offline cache stay private.
+  const STATIC = { '/sw.js': 'text/javascript', '/manifest.webmanifest': 'application/manifest+json' };
+  if (STATIC[rest] || /^\/icons\/[\w.-]+\.png$/.test(rest)) {
+    const r = await env.ASSETS.fetch(new URL(rest, url.origin));
+    // Pages answers unknown paths with index.html, so check we actually got the file.
+    const ct = r.headers.get('content-type') || '';
+    if (!r.ok || (!STATIC[rest] && !ct.startsWith('image/'))) return text('Not found', 404);
+    return new Response(r.body, { headers: { 'content-type': STATIC[rest] || 'image/png', 'cache-control': STATIC[rest] ? 'no-cache' : 'public, max-age=86400' } });
   }
 
   if (rest === '/api/state') {

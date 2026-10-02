@@ -1,21 +1,23 @@
 # Chloe's EA — Cloudflare Pages
 
 ```
-public/index.html          the app
-functions/_middleware.js   locks everything behind /<APP_SECRET>, serves the API
-lib/ics.js                 Google iCal parser
+public/index.html            the app
+public/manifest.webmanifest  home-screen app settings
+public/sw.js                 offline cache
+public/icons/                app icon + iPhone 17 Pro Max splash
+functions/_middleware.js     locks everything behind /<APP_SECRET>/, serves the API
+lib/ics.js                   Google iCal parser
 ```
 
 Must be Git-connected (or `wrangler pages deploy`). Drag-and-drop uploads don't run Functions.
+Settings: Framework None, no build command, output directory `public`. KV binding `DB`.
+Secrets: `APP_SECRET`, `ICS_PERSONAL`, `ICS_BEISE`, `ICS_WORK`. Retry deployment after changing any of them.
 
-1. Push this folder to a new private GitHub repo.
-2. Workers & Pages → Create → Pages → Connect to Git → pick the repo.
-   Framework preset: None. Build command: empty. Output directory: `public`.
-3. Storage & Databases → KV → Create namespace (e.g. `chloe-ea`).
-4. Pages project → Settings → Bindings → Add → KV namespace. Variable name `DB`, pick the namespace.
-5. Settings → Variables and Secrets → add, type Secret, Production:
-   `APP_SECRET`, `ICS_PERSONAL`, `ICS_BEISE`, `ICS_WORK`
-6. Deployments → latest → ⋯ → Retry deployment. Bindings and secrets only apply to new deployments.
-7. Open `https://<project>.pages.dev/<APP_SECRET>`. Everything else returns 404.
+App URL: `https://<project>.pages.dev/<APP_SECRET>/` (a missing trailing slash is added automatically).
 
-Update the app later: edit `public/index.html`, commit, push. Data in KV is untouched.
+## Put it on the iPhone
+Open the URL in Safari → Share → Add to Home Screen. If it was added before this update, delete the old
+home-screen icon and add it again, so iOS picks up the new icon and opens it full screen.
+
+## Change the icon
+Replace the files in `public/icons/` (same names), and bump `VERSION` in `public/sw.js` so phones fetch them.
